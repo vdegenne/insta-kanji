@@ -1,0 +1,15 @@
+:host {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	/*flex-direction: column;*/
+	align-items: flex-start;
+}
+
+#kanji-container {
+	width: 640px;
+	height: 640px;
+	background-color: #000;
+	color: #fff;
+	font-family: 'Noto Serif JP';
+}
