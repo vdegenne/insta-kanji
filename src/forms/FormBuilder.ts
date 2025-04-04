@@ -1,18 +1,18 @@
-import {html, Part} from 'lit';
-import {ifDefined} from 'lit/directives/if-defined.js';
-import {bindInput} from './bindInput.js';
-import {createRef, type Ref, ref} from 'lit/directives/ref.js';
 import {type MdChipSet} from '@material/web/chips/chip-set.js';
 import {type MdFilterChip} from '@material/web/chips/filter-chip.js';
+import {html} from 'lit';
+import {ifDefined} from 'lit/directives/if-defined.js';
+import {createRef, type Ref, ref} from 'lit/directives/ref.js';
+import {
+	literal,
+	html as staticHtml,
+	type StaticValue,
+} from 'lit/static-html.js';
+import {bindInput} from './bindInput.js';
+import '../material/outlined-field-patch.js';
 
 interface SharedOptions {
 	autofocus: boolean;
-}
-
-interface TextFieldOptions extends SharedOptions {
-	// TODO: find a generic type for input type
-	type: 'text' | 'number';
-	suffixText: string | undefined;
 }
 
 type InputOptions = {
@@ -26,8 +26,8 @@ export class FormBuilder<T> {
 		return TEXTFIELD(label, this.host, key, options);
 	}
 
-	TEXTAREA(label: string, key: keyof T) {
-		return TEXTAREA(label, this.host, key);
+	TEXTAREA(label: string, key: keyof T, options?: Partial<TextFieldOptions>) {
+		return TEXTAREA(label, this.host, key, options);
 	}
 
 	SWITCH(headline: string, key: keyof T, options?: Partial<SwitchOptions>) {
@@ -38,7 +38,7 @@ export class FormBuilder<T> {
 		return SLIDER(label, this.host, key, options);
 	}
 
-	SELECT(label: string, key: keyof T, choices: string[] = []) {
+	SELECT(label: string, key: keyof T, choices: string[]) {
 		return SELECT(label, this.host, key, choices);
 	}
 
@@ -144,6 +144,21 @@ export const SELECT = <T>(
 	</md-filled-select>
 `;
 
+interface TextFieldOptions extends SharedOptions {
+	// TODO: find a generic type for input type
+	type: 'text' | 'number' | 'textarea';
+	suffixText: string | undefined;
+	/** @default 'outlined' */
+	style: 'filled' | 'outlined';
+	/**
+	 * Number of rows when the type is "textarea"
+	 * @default 2
+	 */
+	rows: number;
+
+	resetButton: boolean;
+}
+
 export const TEXTFIELD = <T>(
 	label: string,
 	host: T,
@@ -154,36 +169,72 @@ export const TEXTFIELD = <T>(
 		autofocus: false,
 		type: 'text',
 		suffixText: undefined,
+		style: 'outlined',
+		rows: 2,
+		resetButton: true,
 		...options,
 	};
-	return html`
-		<md-filled-text-field
+	let style: StaticValue;
+	switch (_options.style) {
+		case 'filled':
+			import('@material/web/textfield/filled-text-field.js');
+			style = literal`filled`;
+			break;
+
+		case 'outlined':
+			import('@material/web/textfield/outlined-text-field.js');
+			style = literal`outlined`;
+			break;
+	}
+	return staticHtml`
+		<md-${style}-text-field
+			class="flex-1"
 			?autofocus=${_options.autofocus}
 			label=${label.replace(/\*/g, '')}
 			type=${_options.type}
+			.rows=${_options.rows}
+			value=${host[key]}
 			${bindInput(host, key)}
 			?required=${label.includes('*')}
 			suffix-text=${ifDefined(_options.suffixText)}
 		>
-		</md-filled-text-field>
+			${
+				_options.resetButton
+					? html`<md-icon-button
+							slot="trailing-icon"
+							@click=${() => {
+								(host[key] as string) = '';
+							}}
+							><md-icon>clear</md-icon></md-icon-button
+						>`
+					: null
+			}
+		</md-${style}-text-field>
 	`;
 };
 
-export const TEXTAREA = <T>(label: string, host: T, key: keyof T) => html`
-	<md-filled-text-field
-		type="textarea"
-		label=${label}
-		${bindInput(host, key)}
-	></md-filled-text-field>
-`;
+export const TEXTAREA = <T>(
+	label: string,
+	host: T,
+	key: keyof T,
+	options?: Partial<TextFieldOptions>,
+) => TEXTFIELD(label, host, key, {...options, type: 'textarea'});
+
+export const FilterBehavior = {
+	ZeroOrMore: 'zero-or-more',
+	OneOrMore: 'one-or-more',
+	OnlyOne: 'only-one',
+} as const;
+export type FilterBehaviorValue =
+	(typeof FilterBehavior)[keyof typeof FilterBehavior];
 
 interface FilterOptions extends SharedOptions {
 	/**
-	 * Can't unselect all if true
+	 * You can also import and use FilterBehavior enum for clean code :)
 	 *
-	 * @default false
+	 * @default 'zero-or-more'
 	 */
-	atLeastOne: boolean;
+	behavior: FilterBehaviorValue;
 	/**
 	 * @default string
 	 */
@@ -192,7 +243,13 @@ interface FilterOptions extends SharedOptions {
 	 * Not implemented yet.
 	 */
 	sort: 'none' | 'alphabet';
+
+	/**
+	 * @default false
+	 */
+	elevated: boolean;
 }
+type StringOrNumber = string | number;
 
 export const FILTER = <T>(
 	label: string,
@@ -201,43 +258,76 @@ export const FILTER = <T>(
 	choices: string[],
 	options?: Partial<FilterOptions>,
 ) => {
-	options = Object.assign(
-		{},
-		{type: 'string', autofocus: false, atLeastOne: false} as FilterOptions,
-		options ?? {},
-	);
+	const _options: FilterOptions = {
+		autofocus: false,
+		behavior: FilterBehavior.ZeroOrMore,
+		sort: 'none',
+		type: 'string',
+		elevated: false,
+		...(options ?? {}),
+	};
+	const _choices = choices
+		.map((choice, index) => ({value: choice, index})) // Create an array of objects with value and original index
+		.sort((a, b) => {
+			switch (_options.sort) {
+				case 'alphabet':
+					return a.value.localeCompare(b.value); // Sort alphabetically based on value
+				default:
+					return 0; // No sorting (return original order)
+			}
+		});
 	const chipsetref: Ref<MdChipSet> = createRef();
 	return html`
 		<div>
 			<div class="mb-4">${label}</div>
 			<md-chip-set
 				class="justify-stretch"
-				?autofocus=${options.autofocus}
+				?autofocus=${_options.autofocus}
 				${ref(chipsetref)}
-				@click=${(event: Event) => {
+				@click=${async (event: PointerEvent) => {
 					const chipset = chipsetref.value!;
-					if (
-						options.atLeastOne &&
-						(chipset.chips as MdFilterChip[]).filter((c) => c.selected)
-							.length === 0
-					) {
-						event.preventDefault();
+					const chips = chipset.chips as MdFilterChip[];
+					const chip = event.target as MdFilterChip;
+					const chipIndex = chips.indexOf(chip);
+					if (chipIndex === -1) {
+						// clicked outside
 						return;
 					}
-					(host[key] as (string | number)[]) = (chipset.chips as MdFilterChip[])
-						.filter((c) => c.selected)
-						.map((c) =>
-							options.type === 'string' ? c.label : choices.indexOf(c.label),
-						);
+					const getSelectedChip = () => chips.filter((c) => c.selected);
+					switch (_options.behavior) {
+						case 'one-or-more':
+							if (getSelectedChip().length === 0) {
+								event.preventDefault();
+								return;
+							}
+							break;
+
+						case 'only-one':
+							chips.forEach((c, index) => (c.selected = index === chipIndex));
+							break;
+					}
+					const values = getSelectedChip().map((c) =>
+						_options.type === 'string'
+							? c.dataset.value
+							: Number(c.dataset.index),
+					);
+
+					(host[key] as StringOrNumber | StringOrNumber[]) =
+						_options.behavior === 'only-one' ? values[0] : values;
 				}}
 			>
-				${choices.map(
-					(choice, index) => html`
+				${_choices.map(
+					(choice) => html`
 						<md-filter-chip
-							?selected=${(host[key] as (string | number)[]).includes(
-								options.type === 'string' ? choice : index,
-							)}
-							label=${choice}
+							?elevated=${_options.elevated}
+							?selected=${[]
+								.concat(host[key] as StringOrNumber[])
+								.includes(
+									_options.type === 'string' ? choice.value : choice.index,
+								)}
+							data-value=${choice.value}
+							data-index=${choice.index}
+							label=${choice.value}
 						></md-filter-chip>
 					`,
 				)}

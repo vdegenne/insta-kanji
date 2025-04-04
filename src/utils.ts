@@ -1,6 +1,8 @@
+import {toast} from 'toastit';
+
 export function copyToClipboard(text: string) {
 	navigator.clipboard.writeText(text);
-	// toastit('Copied to clipboard.')
+	toast('Copied to clipboard.');
 }
 
 export function sleep(milli: number = 1000) {
@@ -64,7 +66,7 @@ export function getElementsTree(node: Element): Promise<Element[]> {
 }
 export async function getElementInTree(
 	from: Element,
-	condition: (element: Element) => boolean
+	condition: (element: Element) => boolean,
 ): Promise<Element | undefined> {
 	for (const element of await getElementsTree(from)) {
 		if (condition(element)) {
@@ -98,4 +100,48 @@ export function random(min: number, max: number, decimal = 0): number {
 
 export function chatGPTOpen(question: string) {
 	window.open(`https://chatgpt.com/#${encodeURIComponent(question)}`, '_blank');
+}
+
+export function saveDataToFile(data: string, filename: string): void {
+	const blob = new Blob([data], {type: 'text/plain'});
+	const link = document.createElement('a');
+	link.download = filename;
+	link.href = URL.createObjectURL(blob);
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+}
+
+export async function loadDataFromFile(): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const input = document.createElement('input');
+		input.type = 'file';
+
+		input.onchange = () => {
+			const file = input.files?.[0];
+			if (!file) {
+				reject(new Error('No file selected'));
+				return;
+			}
+
+			const reader = new FileReader();
+
+			reader.onload = (event) => {
+				const result = event.target?.result;
+				if (typeof result === 'string') {
+					resolve(result);
+				} else {
+					reject(new Error('File read error: result is not a string'));
+				}
+			};
+
+			reader.onerror = () => {
+				reject(new Error('Error reading file'));
+			};
+
+			reader.readAsText(file);
+		};
+
+		input.click();
+	});
 }

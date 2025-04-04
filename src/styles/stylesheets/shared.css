@@ -3,7 +3,7 @@
 /*@source "../../../node_modules/@vdegenne/forms/lib/FormBuilder.js";*/
 
 [hidden] {
-	display: none;
+	display: none !important;
 }
 
 [invisible] {

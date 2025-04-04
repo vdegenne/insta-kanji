@@ -1,10 +1,11 @@
 {
-  "port": 46771,
-  "include": "./src/**/*.{ts,tsx,js,jsx,html,css}",
-  "openStrategy": "tmux-vim",
-  "tmuxOptions": {
-    "session": ":"
-  },
-  "postExec": "wlrctl window focus Alacritty",
-  "debug": false
+	"port": 46771,
+	"include": "./src/**/*.{ts,tsx,js,jsx,html,css}",
+	"openStrategy": "tmux-vim",
+	"tmuxOptions": {
+		"session": "gits/insta-kanji"
+	},
+	"postExec": "wlrctl window focus kitty",
+	"debug": false
 }
+

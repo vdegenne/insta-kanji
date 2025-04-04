@@ -9,7 +9,7 @@ MdOutlinedField.elementStyles.push(css`
 	.container-overflow {
 		background-color: var(
 			--md-outlined-text-field-container-color,
-			var(--md-sys-color-surface-container)
+			var(--md-sys-color-surface-container-high)
 		);
 	}
 `);

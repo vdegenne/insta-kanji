@@ -6,7 +6,7 @@ import {withStyles} from 'lit-with-styles';
 import {query, state} from 'lit/decorators.js';
 import {FormBuilder} from '../forms/FormBuilder.js';
 import {store} from '../store.js';
-import {themeStore} from '../styles/styles.js';
+import {themeStore} from '../styles/themeStore.js';
 import {renderThemeElements} from '../styles/theme-elements.js';
 import styles from './settings-dialog.css?inline';
 import '../material/dialog-patch.js';
